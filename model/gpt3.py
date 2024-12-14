@@ -18,23 +18,37 @@ class TransformerBlock(nn.Module):
         self.ln_2 = nn.LayerNorm(hidden_size)
 
     def forward(self, x):
-        attn_output, _ = self.attention(x, x, x)
+        # x: [seq_len, batch_size, hidden_size]
+        attn_output, _ = self.attention(x, x, x)   # Multi-head Attention
         x = self.ln_1(x + attn_output)
         ff_output = self.mlp(x)
         x = self.ln_2(x + ff_output)
         return x
 
+class EmbeddingModule(nn.Module):
+    def __init__(self, vocab_size, hidden_size, seq_length):
+        super().__init__()
+        self.token_embedding = nn.Embedding(vocab_size, hidden_size)
+        self.position_embedding = nn.Embedding(seq_length, hidden_size)
+
+    def forward(self, input_ids):
+        # input_ids: [batch_size, seq_length]
+        batch_size, seq_len = input_ids.size()
+        positions = torch.arange(seq_len, device=input_ids.device).unsqueeze(0)  # [1, seq_len]
+        token_emb = self.token_embedding(input_ids)           # [batch_size, seq_len, hidden_size]
+        position_emb = self.position_embedding(positions)     # [1, seq_len, hidden_size]
+        x = token_emb + position_emb
+        # TransformerBlock期望输入维度为 [seq_len, batch_size, hidden_size]
+        x = x.transpose(0, 1)  # 变换为 [seq_len, batch_size, hidden_size]
+        return x
+
+
 # GPT3Model now returns an nn.Sequential
 def build_gpt3_sequential(vocab_size, hidden_size, num_layers, num_heads, seq_length, dropout):
     layers = []
     
-    # Embedding Layers
-    token_embedding = nn.Embedding(vocab_size, hidden_size)
-    position_embedding = nn.Embedding(seq_length, hidden_size)
-    layers.append(nn.ModuleDict({
-        'token_embedding': token_embedding,
-        'position_embedding': position_embedding
-    }))
+    # Embedding layer
+    layers.append(EmbeddingModule(vocab_size, hidden_size, seq_length))
     
     # Transformer Blocks
     for _ in range(num_layers):
@@ -49,8 +63,6 @@ def build_gpt3_sequential(vocab_size, hidden_size, num_layers, num_heads, seq_le
     # Convert to nn.Sequential
     return nn.Sequential(*layers)
 
-
-# Split function (provided)
 def split_module(module: nn.Sequential,
                  balance: Iterable[int],
                  devices: List[torch.device],
@@ -101,7 +113,6 @@ if __name__ == "__main__":
 
     # Split model
     partitions, balance, devices = split_module(gpt3_sequential, balance, devices)
-    
     # Print partitions and their assigned devices
     for i, partition in enumerate(partitions):
         print(f"Partition {i} assigned to {devices[i]}:")
