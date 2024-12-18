@@ -13,7 +13,7 @@ from model.gpt3 import *
 
 def pipe_process(rank: int, world_size: int, model: List[nn.Sequential],batches: List[Batch] = None):
     setup_seed(42)
-    model = Pipe(rank, world_size, model,batches, device=torch.device("cuda:0"))
+    model = Pipe(rank, world_size, model,batches)
     model.run()
     return model.test_grads_, model.model_.weight_, model.datas_
 
@@ -24,8 +24,8 @@ def test_by_pipe():
     vocab_size = 50257  # 词汇表大小
     seq_length = 1024   # 序列长度
     hidden_size = 2304
-    batch_size = 8      # 每批次样本数量
-    num_batches = 5     # 总批次数量
+    batch_size = 1      # 每批次样本数量
+    num_batches = 2     # 总批次数量
     num_layers = 2
     num_heads = 24
     seq_length = 1024

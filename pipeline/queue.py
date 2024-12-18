@@ -28,7 +28,7 @@ class DeviceSwapQueue:
         )
 
         assert source_device_is_cpu ^ target_device_is_cpu
-        #assert 是断言语句，yang，用来检查变量是否符合要求，如果检查不通过，则抛出异常。
+        #assert 是断言语句，用来检查变量是否符合要求，如果检查不通过，则抛出异常。
         if source_device_is_cpu:
             self.copy_stream_: CudaStream = CudaStream(torch.cuda.Stream(target_device))
         else:
@@ -59,6 +59,7 @@ class DeviceSwapQueue:
             # do not use the pined_memory maybe can speedup
             # need more test
             assert msg.tensor_data_ is not None
+            logging.debug(f"data start is in {msg.tensor_data_.device} ")
             copy_tensor = (
                 torch.zeros_like(msg.tensor_data_, device=self.target_device_) 
                 .copy_(msg.tensor_data_, non_blocking=True)
@@ -67,7 +68,7 @@ class DeviceSwapQueue:
             msg.tensor_data_ = copy_tensor
             # msg.tensor_data_ = msg.tensor_data_.to(
             #     self.target_device_, non_blocking=True).detach()
-
+            logging.debug(f"data now  is in {msg.tensor_data_.device} ")
         self.copy_stream_.poll()
 
         logging.debug(
