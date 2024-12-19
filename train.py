@@ -35,7 +35,7 @@ def test_by_pipe(args):
     gpt3_sequential = build_gpt3_sequential(vocab_size, hidden_size, num_layers, num_heads, seq_length, dropout)
 
     # Devices and balance
-    devices = [torch.device(f'cuda:{i}') for i in [0,2,3]]  # Devices based on user input
+    devices = [torch.device(f'cuda:{i}') for i in [0,1,2]]  # Devices based on user input
     balance = list(map(int, args.balance.split(',')))  # Balance as a comma-separated string
 
     # Split model
@@ -43,7 +43,7 @@ def test_by_pipe(args):
 
     # Create processes to run Pipe
     ctx = mp.get_context("spawn")
-    args = ((rank, world_size, partitions[rank], batches if rank == 0 else None) for rank in range(world_size))
+    args = ((rank, world_size, partitions[rank], batches if (rank == 0 or rank == world_size - 1) else None) for rank in range(world_size))
     
     with ctx.Pool(world_size) as pool:
         res = pool.starmap(pipe_process, args)
@@ -57,12 +57,12 @@ def parse_args():
     parser.add_argument('--seq_length', type=int, default=1024, help="Sequence length (default: 1024)")
     parser.add_argument('--hidden_size', type=int, default=2304, help="Hidden size of GPT-3 (default: 2304)")
     parser.add_argument('--batch_size', type=int, default=1, help="Batch size (default: 2)")
-    parser.add_argument('--num_batches', type=int, default=2, help="Number of batches (default: 3)")
+    parser.add_argument('--num_batches', type=int, default=3, help="Number of batches (default: 3)")
     parser.add_argument('--num_layers', type=int, default=2, help="Number of layers in GPT-3 (default: 2)")
     parser.add_argument('--num_heads', type=int, default=24, help="Number of attention heads (default: 24)")
     parser.add_argument('--dropout', type=float, default=0.1, help="Dropout rate (default: 0.1)")
     parser.add_argument('--num_devices', type=int, default=3, help="Number of GPUs (default: 3)")
-    parser.add_argument('--balance', type=str, default='3,1,1', help="Model balance across devices (default: '3,1,1')")
+    parser.add_argument('--balance', type=str, default='2,2,1', help="Model balance across devices (default: '3,1,1')")
 
     return parser.parse_args()
 

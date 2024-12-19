@@ -69,6 +69,11 @@ class Pipe():
             G_TEST_TOTAL_CNT =len(batches)
             assert batches is not None
             self.data_ = batches
+        
+        if self.role_ == WorkerRole.TAIL:
+            self.loss_fn_ = nn.CrossEntropyLoss()
+            assert batches is not None
+            self.data_ = batches
 
         self.forward_cnt_ = 0
         self.forward_stop_ = False
@@ -163,7 +168,10 @@ class Pipe():
                 import traceback
                 traceback.print_exc()
             logging.info(f"device {self.device_} foward count {self.forward_cnt_} Forward done.")
-
+        if self.stop_signal_ is not None:
+            logging.debug(f"self.stop_signal_:{self.stop_signal_}")
+            logging.debug(f"self.stop_signal_.item():{self.stop_signal_.item()}")
+            logging.debug(f"self.forward_cnt_:{self.forward_cnt_}")
         if self.stop_signal_ is not None and self.stop_signal_.item() == self.forward_cnt_:
             self.forward_stop_ = True
 
@@ -174,8 +182,13 @@ class Pipe():
 
         # tail worker need to calc the backward
         if not self.forward_stop_:
-            logging.info(f"Calc the grad {data.sum()}.")
-            data.sum().backward()
+            data = data.permute(1, 0, 2).contiguous().view(-1, 50257)  # 先转置为 (batch_size, seq_length, vocab_size)，然后重塑
+            target_batch = self.data_[self.forward_cnt_-1].to(data.device)
+            labels = target_batch.labels
+            labels = labels.contiguous().view(-1)
+            loss = self.loss_fn_(data, labels)
+            logging.info(f"Calc the grad {loss}.")
+            loss.backward()
             # self.test_grads_.append(self.model_.weight_.grad.sum())
 
 
